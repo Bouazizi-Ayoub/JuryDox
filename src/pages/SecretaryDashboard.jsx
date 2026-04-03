@@ -1,17 +1,31 @@
 import React, { useState } from 'react';
 import { useWeb3 } from '../context/Web3Context';
-import { UploadCloud, FileText, CheckCircle, Clock, XCircle, FileStack } from 'lucide-react';
+import { UploadCloud, FileText, CheckCircle, Clock, XCircle, FileStack, RefreshCw, Eye } from 'lucide-react';
 
 const SecretaryDashboard = () => {
-    const { documents, setDocuments } = useWeb3();
+    const { documents, uploadDocument, resubmitDocument, account, filterDocumentsByStatus, searchDocuments } = useWeb3();
     const [file, setFile] = useState(null);
     const [isUploading, setIsUploading] = useState(false);
     const [success, setSuccess] = useState(false);
     const [activeTab, setActiveTab] = useState('upload');
+    const [selectedDoc, setSelectedDoc] = useState(null);
+    const [resubmitFile, setResubmitFile] = useState(null);
+    const [isResubmitting, setIsResubmitting] = useState(null);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [filterStatus, setFilterStatus] = useState('all');
 
-    const pendingDocs = documents.filter(d => d.status === 'Pending');
-    const approvedDocs = documents.filter(d => d.status === 'Approved');
-    const refusedDocs = documents.filter(d => d.status === 'Refused');
+    // Filter documents
+    let displayedDocs = documents;
+    if (filterStatus && filterStatus !== 'all') {
+        displayedDocs = filterDocumentsByStatus(filterStatus);
+    }
+    if (searchQuery) {
+        displayedDocs = searchDocuments(searchQuery);
+    }
+
+    const pendingDocs = documents.filter(d => d.status === 'pending' || d.status === 'under_review');
+    const approvedDocs = documents.filter(d => d.status === 'approved');
+    const rejectedDocs = documents.filter(d => d.status === 'rejected');
 
     const handleFileChange = (e) => {
         if (e.target.files && e.target.files[0]) {
@@ -26,37 +40,57 @@ const SecretaryDashboard = () => {
 
         // Simulate IPFS upload delay
         setTimeout(() => {
-            const mockIpfsHash = 'Qm' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-
-            const newDoc = {
-                id: Date.now().toString(),
-                name: file.name,
-                ipfsHash: mockIpfsHash,
-                status: 'Pending',
-                timestamp: new Date().toISOString()
-            };
-
-            setDocuments([...documents, newDoc]);
+            uploadDocument(file.name, file.size, account);
             setIsUploading(false);
             setSuccess(true);
             setFile(null);
-
             setTimeout(() => setSuccess(false), 3000);
         }, 2000);
     };
 
-    const statusIcon = (status) => {
+    const handleResubmit = (docId) => {
+        if (!resubmitFile) return;
+        setIsResubmitting(docId);
+
+        setTimeout(() => {
+            resubmitDocument(docId, resubmitFile.size, account);
+            setIsResubmitting(null);
+            setResubmitFile(null);
+            setSelectedDoc(null);
+        }, 2000);
+    };
+
+    const getStatusColor = (status) => {
         switch (status) {
-            case 'Pending': return <Clock size={14} color="var(--warning-color)" />;
-            case 'Approved': return <CheckCircle size={14} color="var(--success-color)" />;
-            case 'Refused': return <XCircle size={14} color="var(--danger-color)" />;
+            case 'pending':
+            case 'under_review':
+                return 'var(--warning-color)';
+            case 'approved':
+                return 'var(--success-color)';
+            case 'rejected':
+                return 'var(--danger-color)';
+            case 'resubmitted':
+                return 'var(--accent-color)';
+            default:
+                return 'var(--text-secondary)';
+        }
+    };
+
+    const getStatusIcon = (status) => {
+        switch (status) {
+            case 'pending': return <Clock size={14} />;
+            case 'under_review': return <Clock size={14} />;
+            case 'approved': return <CheckCircle size={14} />;
+            case 'rejected': return <XCircle size={14} />;
             default: return null;
         }
     };
 
     const statusBadge = (status) => {
-        const cls = status === 'Pending' ? 'badge-pending' : status === 'Approved' ? 'badge-approved' : 'badge-refused';
-        return <span className={`badge ${cls}`}>{status}</span>;
+        const badgeClass = status === 'pending' || status === 'under_review' ? 'badge-pending'
+            : status === 'approved' ? 'badge-approved'
+            : 'badge-refused';
+        return <span className={badgeClass}>{status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}</span>;
     };
 
     return (
@@ -65,16 +99,16 @@ const SecretaryDashboard = () => {
                 <h2 className="glow-text" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <UploadCloud size={28} color="var(--accent-color)" /> Secretary Dashboard
                 </h2>
-                <p style={{ color: 'var(--text-secondary)' }}>Upload legal documents for Jury review and track their status.</p>
+                <p style={{ color: 'var(--text-secondary)' }}>Upload and manage legal documents through the review process.</p>
             </div>
 
             {/* Tabs */}
             <div className="tab-bar">
-                <button className={`tab-btn ${activeTab === 'upload' ? 'active' : ''}`} onClick={() => setActiveTab('upload')}>
+                <button className="tab-btn" onClick={() => setActiveTab('upload')}>
                     <UploadCloud size={14} /> Upload Document
                 </button>
-                <button className={`tab-btn ${activeTab === 'tracking' ? 'active' : ''}`} onClick={() => setActiveTab('tracking')}>
-                    <FileStack size={14} /> All Documents <span className="count-badge">{documents.length}</span>
+                <button className="tab-btn" onClick={() => setActiveTab('tracking')}>
+                    <FileStack size={14} /> Track Documents <span className="count-badge">{documents.length}</span>
                 </button>
             </div>
 
@@ -84,15 +118,21 @@ const SecretaryDashboard = () => {
                     <div className="glass-panel" style={{ maxWidth: '600px', margin: '0 auto', textAlign: 'center' }}>
                         <label className="file-upload-label" style={{ marginBottom: '24px' }}>
                             <UploadCloud size={48} color="var(--accent-color)" style={{ marginBottom: '16px' }} />
-                            <h3 style={{ marginBottom: '8px' }}>Select PDF Document</h3>
-                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Click or drag to drop a file</p>
+                            <h3 style={{ marginBottom: '8px' }}>Upload New Document</h3>
+                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Click or drag to drop a PDF file</p>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '8px' }}>
+                                Document will be encrypted and stored on IPFS
+                            </div>
                             <input type="file" accept=".pdf" onChange={handleFileChange} />
                         </label>
 
                         {file && (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginBottom: '24px', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px' }}>
                                 <FileText size={20} color="var(--accent-hover)" />
-                                <span>{file.name}</span>
+                                <div style={{ textAlign: 'left', fontSize: '0.85rem' }}>
+                                    <div className="mono">{file.name}</div>
+                                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>{(file.size / 1024).toFixed(2)} KB</div>
+                                </div>
                             </div>
                         )}
 
@@ -102,7 +142,7 @@ const SecretaryDashboard = () => {
                             style={{ width: '100%', padding: '12px' }}
                         >
                             {isUploading ? (
-                                <><UploadCloud className="animate-spin" size={18} /> Uploading to IPFS...</>
+                                <><UploadCloud size={18} style={{ animation: 'spin 1s linear infinite' }} /> Uploading to IPFS...</>
                             ) : (
                                 <>Submit Document for Review</>
                             )}
@@ -110,7 +150,7 @@ const SecretaryDashboard = () => {
 
                         {success && (
                             <div className="fade-in" style={{ marginTop: '16px', color: 'var(--success-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                                <CheckCircle size={18} /> Document uploaded and queued for Jury review!
+                                <CheckCircle size={18} /> Document submitted successfully!
                             </div>
                         )}
                     </div>
@@ -132,37 +172,128 @@ const SecretaryDashboard = () => {
                             <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
                                 <div className="glass-panel" style={{ flex: 1, minWidth: '140px', padding: '16px', textAlign: 'center' }}>
                                     <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--warning-color)' }}>{pendingDocs.length}</div>
-                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Pending</div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Pending/Review</div>
                                 </div>
                                 <div className="glass-panel" style={{ flex: 1, minWidth: '140px', padding: '16px', textAlign: 'center' }}>
                                     <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--success-color)' }}>{approvedDocs.length}</div>
                                     <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Approved</div>
                                 </div>
                                 <div className="glass-panel" style={{ flex: 1, minWidth: '140px', padding: '16px', textAlign: 'center' }}>
-                                    <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--danger-color)' }}>{refusedDocs.length}</div>
-                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Refused</div>
+                                    <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--danger-color)' }}>{rejectedDocs.length}</div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Rejected</div>
                                 </div>
+                            </div>
+
+                            {/* Search & Filter */}
+                            <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
+                                <input
+                                    type="text"
+                                    className="text-input"
+                                    placeholder="Search by document name or ID..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    style={{ flex: 1, minWidth: '200px' }}
+                                />
+                                <select
+                                    className="text-input"
+                                    value={filterStatus}
+                                    onChange={(e) => setFilterStatus(e.target.value)}
+                                    style={{ minWidth: '150px' }}
+                                >
+                                    <option value="all">All Statuses</option>
+                                    <option value="pending">Pending</option>
+                                    <option value="under_review">Under Review</option>
+                                    <option value="approved">Approved</option>
+                                    <option value="rejected">Rejected</option>
+                                </select>
                             </div>
 
                             {/* Document list */}
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                {documents.map(doc => (
-                                    <div key={doc.id} className="glass-panel" style={{ padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
-                                            {statusIcon(doc.status)}
-                                            <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.name}</span>
-                                        </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
-                                            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>{doc.ipfsHash.slice(0, 12)}...</span>
-                                            {statusBadge(doc.status)}
-                                        </div>
-                                        {doc.status === 'Refused' && doc.refuseReason && (
-                                            <div style={{ width: '100%', fontSize: '0.8rem', color: 'var(--danger-color)', paddingLeft: '28px', marginTop: '4px' }}>
-                                                Reason: {doc.refuseReason}
-                                            </div>
-                                        )}
+                                {displayedDocs.length === 0 ? (
+                                    <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                        No documents match your criteria
                                     </div>
-                                ))}
+                                ) : (
+                                    displayedDocs.map(doc => (
+                                        <div key={doc.id} className="glass-panel" style={{ padding: '16px' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', marginBottom: '12px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', flex: 1, minWidth: 0 }}>
+                                                    <div style={{ color: getStatusColor(doc.status), marginTop: '2px' }}>
+                                                        {getStatusIcon(doc.status)}
+                                                    </div>
+                                                    <div style={{ minWidth: 0 }}>
+                                                        <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                            {doc.name}
+                                                        </div>
+                                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                                                            <div className="mono">ID: {doc.id.slice(0, 12)}...</div>
+                                                            <div className="mono">v{doc.version} � {new Date(doc.timestamp).toLocaleDateString()}</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+                                                    {statusBadge(doc.status)}
+                                                    <button 
+                                                        className="btn-ghost btn-sm"
+                                                        onClick={() => setSelectedDoc(doc)}
+                                                        title="View details"
+                                                    >
+                                                        <Eye size={14} />
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* Rejection info */}
+                                            {doc.status === 'rejected' && doc.rejectionComment && (
+                                                <div style={{ background: 'rgba(255, 0, 0, 0.05)', border: '1px solid var(--danger-color)', borderRadius: '6px', padding: '12px', marginBottom: '12px', fontSize: '0.85rem' }}>
+                                                    <div style={{ color: 'var(--danger-color)', fontWeight: 600, marginBottom: '4px' }}>Rejection Reason:</div>
+                                                    <div style={{ color: 'var(--text-secondary)' }}>{doc.rejectionComment}</div>
+                                                </div>
+                                            )}
+
+                                            {/* Resubmit button */}
+                                            {doc.status === 'rejected' && selectedDoc?.id === doc.id && (
+                                                <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--accent-color)', borderRadius: '6px', padding: '12px', marginBottom: '12px' }}>
+                                                    <div style={{ marginBottom: '12px', fontSize: '0.85rem', fontWeight: 600 }}>
+                                                        <RefreshCw size={14} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
+                                                        Resubmit Updated Document
+                                                    </div>
+                                                    <input
+                                                        type="file"
+                                                        accept=".pdf"
+                                                        onChange={(e) => setResubmitFile(e.target.files?.[0])}
+                                                        style={{ marginBottom: '12px', fontSize: '0.85rem' }}
+                                                    />
+                                                    <button
+                                                        onClick={() => handleResubmit(doc.id)}
+                                                        disabled={!resubmitFile || isResubmitting === doc.id}
+                                                        style={{ width: '100%', padding: '8px' }}
+                                                    >
+                                                        {isResubmitting === doc.id ? '?? Resubmitting...' : 'Submit New Version'}
+                                                    </button>
+                                                </div>
+                                            )}
+
+                                            {selectedDoc?.id === doc.id && (
+                                                <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid rgba(255, 255, 255, 0.1)', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                                                    <div><strong>IPFS Hash:</strong> <code style={{fontSize: '0.75rem'}}>{doc.ipfsHash}</code></div>
+                                                    {doc.txHash && <div><strong>TX Hash:</strong> <code style={{fontSize: '0.75rem'}}>{doc.txHash}</code></div>}
+                                                    {doc.votes?.length > 0 && (
+                                                        <div style={{ marginTop: '8px' }}>
+                                                            <strong>Jury Votes ({doc.votes.length}):</strong>
+                                                            {doc.votes.map((vote, i) => (
+                                                                <div key={i} style={{marginLeft: '12px', fontSize: '0.8rem'}}>
+                                                                    {vote.vote.toUpperCase()} {vote.comment ? `- ${vote.comment}` : ''}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))
+                                )}
                             </div>
                         </>
                     )}

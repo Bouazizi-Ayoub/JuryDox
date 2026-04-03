@@ -2,16 +2,18 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Web3Provider, useWeb3 } from './context/Web3Context';
 import Navbar from './components/Navbar';
+import NotificationCenter from './components/NotificationCenter';
 import SecretaryDashboard from './pages/SecretaryDashboard';
 import JuryDashboard from './pages/JuryDashboard';
 import LawyerDashboard from './pages/LawyerDashboard';
+import AnalyticsDashboard from './pages/AnalyticsDashboard';
 
 const RoleBasedRoute = ({ children, allowedRole }) => {
-  const { role, account } = useWeb3();
-  if (!account) {
+  const { role } = useWeb3();
+  if (!role) {
     return (
       <div className="container" style={{ textAlign: 'center', marginTop: '4rem' }}>
-        <h2 className="glow-text">Please connect your wallet to continue.</h2>
+        <h2 className="glow-text">Veuillez choisir un rôle ou connecter un wallet pour continuer.</h2>
       </div>
     );
   }
@@ -22,17 +24,17 @@ const RoleBasedRoute = ({ children, allowedRole }) => {
 };
 
 const DashboardRouter = () => {
-  const { role, account } = useWeb3();
+  const { role } = useWeb3();
 
-  if (!account) {
+  if (!role) {
     return (
       <div className="container" style={{ textAlign: 'center', marginTop: '10rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <h1 className="glow-text gradient-text" style={{ fontSize: '4rem', marginBottom: '1rem' }}>
           JuryDoX Portal
         </h1>
         <p style={{ color: 'var(--text-secondary)', fontSize: '1.2rem', maxWidth: '600px', lineHeight: 1.6 }}>
-          A decentralized, tamper-proof platform for managing legal documents.
-          Connect your wallet to access your role-specific dashboard.
+          A decentralized, tamper-proof platform pour gérer les documents juridiques.
+          Choisissez un rôle invité ou connectez votre wallet pour continuer.
         </p>
       </div>
     );
@@ -54,6 +56,7 @@ const App = () => {
   return (
     <Web3Provider>
       <BrowserRouter>
+        <NotificationCenter />
         <div className="main-content">
           <Navbar />
           <Routes>
@@ -73,6 +76,7 @@ const App = () => {
                 <LawyerDashboard />
               </RoleBasedRoute>
             } />
+            <Route path="/analytics" element={<AnalyticsDashboard />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </div>

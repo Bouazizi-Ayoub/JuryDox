@@ -1,0 +1,35 @@
+{
+  "name": "jurydox-contracts",
+  "version": "1.0.0",
+  "description": "Smart contracts for JuryDoX - Decentralized Legal Document Management",
+  "main": "index.js",
+  "scripts": {
+    "compile": "npx hardhat compile",
+    "test": "npx hardhat test",
+    "deploy": "npx hardhat run scripts/deploy.js",
+    "deploy:sepolia": "npx hardhat run scripts/deploy.js --network sepolia",
+    "verify": "npx hardhat verify --network sepolia",
+    "node": "npx hardhat node",
+    "clean": "npx hardhat clean"
+  },
+  "devDependencies": {
+    "@nomiclabs/hardhat-etherscan": "^3.1.7",
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "chai": "^4.3.10",
+    "ethers": "^6.8.1",
+    "hardhat": "^2.19.0",
+    "hardhat-gas-reporter": "^1.0.9",
+    "solidity-coverage": "^0.8.5"
+  },
+  "dependencies": {},
+  "keywords": [
+    "blockchain",
+    "ethereum",
+    "smart-contracts",
+    "legal",
+    "documents",
+    "decentralized"
+  ],
+  "author": "JuryDoX Team",
+  "license": "MIT"
+}
