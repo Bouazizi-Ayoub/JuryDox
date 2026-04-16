@@ -1,14 +1,15 @@
 ﻿import React, { useState } from 'react';
 import { useWeb3 } from '../context/Web3Context';
-import { BarChart2, FileText, CheckCircle2, XCircle, Download, Eye } from 'lucide-react';
+import { BarChart2, FileText, CheckCircle2, XCircle, Download, Eye, Link } from 'lucide-react';
 
-const JuryDashboard = () => {
-    const { documents, voteOnDocument, getStats, account, role } = useWeb3();
+const JudgeDashboard = () => {
+    const { documents, voteOnDocument, getStats, account, role, getIPFSUrl, generateAccessToken } = useWeb3();
     const [comments, setComments] = useState({});
     const [selectedDocId, setSelectedDocId] = useState(null);
 
     const stats = getStats();
     const pendingDocs = documents.filter(d => d.status === 'pending' || d.status === 'under_review');
+    const approvedDocs = documents.filter(d => d.status === 'approved');
 
     const handleCommentChange = (docId, value) => {
         setComments(prev => ({ ...prev, [docId]: value }));
@@ -26,34 +27,14 @@ const JuryDashboard = () => {
     };
 
     const viewDocument = (ipfsHash) => {
-        // Utilise le gateway IPFS configuré ou un gateway public par défaut
-        const gateway = import.meta.env.VITE_IPFS_GATEWAY || 'https://gateway.pinata.cloud/ipfs';
-        const url = `${gateway}/${ipfsHash}`;
+        const url = getIPFSUrl(ipfsHash);
         window.open(url, '_blank');
     };
 
-    const downloadDocument = async (ipfsHash, fileName) => {
+    const downloadDocument = (ipfsHash) => {
         try {
-            const gateway = import.meta.env.VITE_IPFS_GATEWAY || 'https://gateway.pinata.cloud/ipfs';
-            const url = `${gateway}/${ipfsHash}`;
-
-            // Pour le téléchargement, on ouvre dans un nouvel onglet
-            // En production, tu pourrais implémenter un vrai téléchargement avec fetch + blob
+            const url = getIPFSUrl(ipfsHash);
             window.open(url, '_blank');
-
-            // Alternative pour vrai téléchargement (si besoin) :
-            /*
-            const response = await fetch(url);
-            const blob = await response.blob();
-            const downloadUrl = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = downloadUrl;
-            a.download = fileName || `document-${ipfsHash.slice(0, 8)}.pdf`;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(downloadUrl);
-            document.body.removeChild(a);
-            */
         } catch (error) {
             console.error('Erreur lors du téléchargement:', error);
             alert('Erreur lors du téléchargement du document');
@@ -64,9 +45,9 @@ const JuryDashboard = () => {
         <div className="container">
             <div style={{ marginBottom: '2rem' }}>
                 <h2 className="glow-text" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <BarChart2 size={28} color="var(--accent-color)" /> Jury Dashboard
+                    <BarChart2 size={28} color="var(--accent-color)" /> Judge Dashboard
                 </h2>
-                <p style={{ color: 'var(--text-secondary)' }}>Accès jury (en mode {role || 'inconnu'}). Gestion des votes et revue des documents.</p>
+                <p style={{ color: 'var(--text-secondary)' }}>Accès judge (en mode {role || 'inconnu'}). Gestion des votes et revue des documents.</p>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: '16px', marginBottom: '24px' }}>
@@ -177,9 +158,40 @@ const JuryDashboard = () => {
                     </div>
                 )}
             </div>
+
+            <div style={{ marginBottom: '2rem' }}>
+                <h3 style={{ marginBottom: '1rem' }}><CheckCircle2 size={18} color="var(--success-color)" /> Documents approuvés</h3>
+                {approvedDocs.length === 0 ? (
+                    <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}>
+                        Aucun document approuvé.
+                    </div>
+                ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        {approvedDocs.map(doc => (
+                            <div key={doc.id} className="glass-panel" style={{ padding: '14px', borderRadius: '10px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div>
+                                        <h4 style={{ margin: '0 0 4px 0' }}>{doc.name}</h4>
+                                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                            Approuvé le: {new Date(doc.reviewedAt).toLocaleString()}
+                                        </div>
+                                    </div>
+                                    <button
+                                        className="btn-primary"
+                                        onClick={() => generateAccessToken(doc.id)}
+                                        style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                                    >
+                                        <Link size={14} /> Générer un lien d'accès (Avocat)
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
         </div>
     );
 };
 
-export default JuryDashboard;
+export default JudgeDashboard;
 

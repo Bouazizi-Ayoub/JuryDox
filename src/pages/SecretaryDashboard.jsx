@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useWeb3 } from '../context/Web3Context';
-import { UploadCloud, FileText, CheckCircle, Clock, XCircle, FileStack, RefreshCw, Eye } from 'lucide-react';
+import { UploadCloud, FileText, CheckCircle, Clock, XCircle, FileStack, RefreshCw, Eye, ExternalLink } from 'lucide-react';
 
 const SecretaryDashboard = () => {
-    const { documents, uploadDocument, resubmitDocument, account, filterDocumentsByStatus, searchDocuments } = useWeb3();
+    const { documents, uploadDocument, resubmitDocument, account, filterDocumentsByStatus, searchDocuments, ipfsReady, getIPFSUrl } = useWeb3();
     const [file, setFile] = useState(null);
     const [isUploading, setIsUploading] = useState(false);
     const [success, setSuccess] = useState(false);
@@ -34,30 +34,35 @@ const SecretaryDashboard = () => {
         }
     };
 
-    const handleUpload = () => {
+    const handleUpload = async () => {
         if (!file) return;
         setIsUploading(true);
 
-        // Simulate IPFS upload delay
-        setTimeout(() => {
-            uploadDocument(file.name, file.size, account);
-            setIsUploading(false);
+        try {
+            await uploadDocument(file.name, file.size, account, file);
             setSuccess(true);
             setFile(null);
             setTimeout(() => setSuccess(false), 3000);
-        }, 2000);
+        } catch (error) {
+            console.error('Upload failed:', error);
+        } finally {
+            setIsUploading(false);
+        }
     };
 
-    const handleResubmit = (docId) => {
+    const handleResubmit = async (docId) => {
         if (!resubmitFile) return;
         setIsResubmitting(docId);
 
-        setTimeout(() => {
-            resubmitDocument(docId, resubmitFile.size, account);
-            setIsResubmitting(null);
+        try {
+            await resubmitDocument(docId, resubmitFile.size, account, resubmitFile);
             setResubmitFile(null);
             setSelectedDoc(null);
-        }, 2000);
+        } catch (error) {
+            console.error('Resubmit failed:', error);
+        } finally {
+            setIsResubmitting(null);
+        }
     };
 
     const getStatusColor = (status) => {
@@ -89,7 +94,7 @@ const SecretaryDashboard = () => {
     const statusBadge = (status) => {
         const badgeClass = status === 'pending' || status === 'under_review' ? 'badge-pending'
             : status === 'approved' ? 'badge-approved'
-            : 'badge-refused';
+                : 'badge-refused';
         return <span className={badgeClass}>{status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}</span>;
     };
 
@@ -142,9 +147,9 @@ const SecretaryDashboard = () => {
                             style={{ width: '100%', padding: '12px' }}
                         >
                             {isUploading ? (
-                                <><UploadCloud size={18} style={{ animation: 'spin 1s linear infinite' }} /> Uploading to IPFS...</>
+                                <><UploadCloud size={18} style={{ animation: 'spin 1s linear infinite' }} /> {ipfsReady ? 'Uploading to IPFS...' : 'Uploading...'}</>
                             ) : (
-                                <>Submit Document for Review</>
+                                <>{ipfsReady ? 'Submit Document (IPFS)' : 'Submit Document for Review'}</>
                             )}
                         </button>
 
@@ -234,7 +239,7 @@ const SecretaryDashboard = () => {
                                                 </div>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
                                                     {statusBadge(doc.status)}
-                                                    <button 
+                                                    <button
                                                         className="btn-ghost btn-sm"
                                                         onClick={() => setSelectedDoc(doc)}
                                                         title="View details"
@@ -277,13 +282,20 @@ const SecretaryDashboard = () => {
 
                                             {selectedDoc?.id === doc.id && (
                                                 <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid rgba(255, 255, 255, 0.1)', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                                                    <div><strong>IPFS Hash:</strong> <code style={{fontSize: '0.75rem'}}>{doc.ipfsHash}</code></div>
-                                                    {doc.txHash && <div><strong>TX Hash:</strong> <code style={{fontSize: '0.75rem'}}>{doc.txHash}</code></div>}
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                        <strong>IPFS Hash:</strong> <code style={{ fontSize: '0.75rem' }}>{doc.ipfsHash}</code>
+                                                        {doc.ipfsHash && !doc.ipfsHash.startsWith('Qm') && (
+                                                            <a href={getIPFSUrl(doc.ipfsHash)} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-color)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                                <ExternalLink size={12} /> View
+                                                            </a>
+                                                        )}
+                                                    </div>
+                                                    {doc.txHash && <div><strong>TX Hash:</strong> <code style={{ fontSize: '0.75rem' }}>{doc.txHash}</code></div>}
                                                     {doc.votes?.length > 0 && (
                                                         <div style={{ marginTop: '8px' }}>
-                                                            <strong>Jury Votes ({doc.votes.length}):</strong>
+                                                            <strong>Judge Votes ({doc.votes.length}):</strong>
                                                             {doc.votes.map((vote, i) => (
-                                                                <div key={i} style={{marginLeft: '12px', fontSize: '0.8rem'}}>
+                                                                <div key={i} style={{ marginLeft: '12px', fontSize: '0.8rem' }}>
                                                                     {vote.vote.toUpperCase()} {vote.comment ? `- ${vote.comment}` : ''}
                                                                 </div>
                                                             ))}

@@ -18,7 +18,7 @@ const AnalyticsDashboard = () => {
         return acc;
     }, { totalVersions: 0, avgVersion: 0 });
 
-    const juryVoteStats = documents.reduce((acc, doc) => {
+    const judgeVoteStats = documents.reduce((acc, doc) => {
         acc.totalVotes += doc.votes.length;
         acc.avgVotesPerDoc = acc.totalVotes / Math.max(documents.length, 1);
         return acc;
@@ -99,19 +99,19 @@ const AnalyticsDashboard = () => {
                 <div className="glass-panel" style={{ padding: '20px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
                         <TrendingUp size={20} color="var(--accent-color)" />
-                        <h3 style={{ margin: 0, fontSize: '1rem' }}>Jury Voting</h3>
+                        <h3 style={{ margin: 0, fontSize: '1rem' }}>Judge Voting</h3>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                         <div>
                             <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--accent-color)' }}>
-                                {juryVoteStats.avgVotesPerDoc.toFixed(1)}
+                                {judgeVoteStats.avgVotesPerDoc.toFixed(1)}
                             </div>
                             <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
                                 Average votes per document
                             </div>
                         </div>
                         <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--text-secondary)', opacity: 0.5 }}>
-                            {juryVoteStats.totalVotes}
+                            {judgeVoteStats.totalVotes}
                         </div>
                     </div>
                 </div>

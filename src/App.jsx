@@ -4,7 +4,7 @@ import { Web3Provider, useWeb3 } from './context/Web3Context';
 import Navbar from './components/Navbar';
 import NotificationCenter from './components/NotificationCenter';
 import SecretaryDashboard from './pages/SecretaryDashboard';
-import JuryDashboard from './pages/JuryDashboard';
+import JudgeDashboard from './pages/JudgeDashboard';
 import LawyerDashboard from './pages/LawyerDashboard';
 import AnalyticsDashboard from './pages/AnalyticsDashboard';
 
@@ -30,7 +30,7 @@ const DashboardRouter = () => {
     return (
       <div className="container" style={{ textAlign: 'center', marginTop: '10rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <h1 className="glow-text gradient-text" style={{ fontSize: '4rem', marginBottom: '1rem' }}>
-          JuryDoX Portal
+          JudgeDoX Portal
         </h1>
         <p style={{ color: 'var(--text-secondary)', fontSize: '1.2rem', maxWidth: '600px', lineHeight: 1.6 }}>
           A decentralized, tamper-proof platform pour gérer les documents juridiques.
@@ -42,7 +42,7 @@ const DashboardRouter = () => {
 
   switch (role) {
     case 'Secretary': return <Navigate to="/secretary" />;
-    case 'Jury': return <Navigate to="/jury" />;
+    case 'Judge': return <Navigate to="/judge" />;
     case 'Lawyer': return <Navigate to="/lawyer" />;
     default: return (
       <div className="container" style={{ textAlign: 'center', marginTop: '4rem' }}>
@@ -66,9 +66,9 @@ const App = () => {
                 <SecretaryDashboard />
               </RoleBasedRoute>
             } />
-            <Route path="/jury" element={
-              <RoleBasedRoute allowedRole="Jury">
-                <JuryDashboard />
+            <Route path="/judge" element={
+              <RoleBasedRoute allowedRole="Judge">
+                <JudgeDashboard />
               </RoleBasedRoute>
             } />
             <Route path="/lawyer" element={
