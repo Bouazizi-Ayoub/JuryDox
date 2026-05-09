@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
 import { useWeb3 } from '../context/Web3Context';
-import { UploadCloud, FileText, CheckCircle, Clock, XCircle, FileStack, RefreshCw, Eye, ExternalLink } from 'lucide-react';
+import { UploadCloud, FileText, CheckCircle, Clock, XCircle, FileStack, RefreshCw, Eye, ExternalLink, Hourglass } from 'lucide-react';
 
 const SecretaryDashboard = () => {
-    const { documents, uploadDocument, resubmitDocument, account, filterDocumentsByStatus, searchDocuments, ipfsReady, getIPFSUrl } = useWeb3();
+    const {
+        documents, uploadDocument, resubmitDocument, account,
+        filterDocumentsByStatus, searchDocuments, ipfsReady, getIPFSUrl,
+        judgeAddress,
+    } = useWeb3();
     const [file, setFile] = useState(null);
     const [isUploading, setIsUploading] = useState(false);
     const [success, setSuccess] = useState(false);
@@ -98,13 +102,37 @@ const SecretaryDashboard = () => {
         return <span className={badgeClass}>{status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}</span>;
     };
 
+    // ─── Waiting Gate ───
+    if (!judgeAddress) {
+        return (
+            <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '70vh' }}>
+                <div className="glass-panel" style={{ maxWidth: '480px', width: '100%', padding: '2.5rem', textAlign: 'center' }}>
+                    <Hourglass size={48} color="var(--accent-color)" style={{ marginBottom: '1.2rem', opacity: 0.7 }} />
+                    <h2 style={{ marginBottom: '0.5rem' }}>Waiting for Assignment</h2>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: 1.6 }}>
+                        You haven't been assigned to a Judge's case room yet.<br />
+                        Ask your Judge to add your wallet address from their dashboard.
+                    </p>
+                    <div style={{ marginTop: '1.5rem', background: 'rgba(255,255,255,0.04)', borderRadius: '8px', padding: '12px 16px', fontFamily: 'monospace', fontSize: '0.82rem', color: 'var(--accent-color)', wordBreak: 'break-all' }}>
+                        Your address: {account}
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="container">
             <div style={{ marginBottom: '2rem' }}>
                 <h2 className="glow-text" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <UploadCloud size={28} color="var(--accent-color)" /> Secretary Dashboard
                 </h2>
-                <p style={{ color: 'var(--text-secondary)' }}>Upload and manage legal documents through the review process.</p>
+                <p style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    Upload and manage legal documents through the review process.
+                    <span style={{ fontSize: '0.78rem', background: 'rgba(20,184,166,0.1)', border: '1px solid rgba(20,184,166,0.3)', borderRadius: '6px', padding: '3px 10px', fontFamily: 'monospace', color: 'var(--accent-color)' }}>
+                        Judge: {judgeAddress.slice(0, 6)}...{judgeAddress.slice(-4)}
+                    </span>
+                </p>
             </div>
 
             {/* Tabs */}
@@ -258,24 +286,42 @@ const SecretaryDashboard = () => {
                                             )}
 
                                             {/* Resubmit button */}
-                                            {doc.status === 'rejected' && selectedDoc?.id === doc.id && (
+                                            {doc.status === 'rejected' && (
                                                 <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--accent-color)', borderRadius: '6px', padding: '12px', marginBottom: '12px' }}>
                                                     <div style={{ marginBottom: '12px', fontSize: '0.85rem', fontWeight: 600 }}>
                                                         <RefreshCw size={14} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
                                                         Resubmit Updated Document
                                                     </div>
-                                                    <input
-                                                        type="file"
-                                                        accept=".pdf"
-                                                        onChange={(e) => setResubmitFile(e.target.files?.[0])}
-                                                        style={{ marginBottom: '12px', fontSize: '0.85rem' }}
-                                                    />
+                                                    {resubmitFile ? (
+                                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '12px', background: 'rgba(20,184,166,0.1)', padding: '8px', borderRadius: '6px', border: '1px solid rgba(20,184,166,0.2)' }}>
+                                                            <FileText size={16} color="var(--accent-color)" />
+                                                            <div className="mono" style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>{resubmitFile.name}</div>
+                                                            <button onClick={() => setResubmitFile(null)} style={{ background: 'none', border: 'none', padding: '2px', color: 'var(--text-secondary)' }}><XCircle size={14}/></button>
+                                                        </div>
+                                                    ) : (
+                                                        <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: '1px dashed rgba(20,184,166,0.5)', borderRadius: '8px', padding: '16px', cursor: 'pointer', marginBottom: '12px', background: 'rgba(20,184,166,0.05)', transition: 'all 0.2s' }}>
+                                                            <UploadCloud size={20} color="var(--accent-color)" style={{ marginBottom: '6px' }} />
+                                                            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Click to select updated PDF</span>
+                                                            <input
+                                                                type="file"
+                                                                accept=".pdf"
+                                                                onChange={(e) => setResubmitFile(e.target.files?.[0])}
+                                                            />
+                                                        </label>
+                                                    )}
                                                     <button
-                                                        onClick={() => handleResubmit(doc.id)}
-                                                        disabled={!resubmitFile || isResubmitting === doc.id}
-                                                        style={{ width: '100%', padding: '8px' }}
+                                                        className="btn-primary"
+                                                        onClick={() => {
+                                                            if (!resubmitFile) {
+                                                                alert('Please select a PDF file to resubmit.');
+                                                                return;
+                                                            }
+                                                            handleResubmit(doc.id);
+                                                        }}
+                                                        disabled={isResubmitting === doc.id}
+                                                        style={{ width: '100%', padding: '8px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}
                                                     >
-                                                        {isResubmitting === doc.id ? '?? Resubmitting...' : 'Submit New Version'}
+                                                        {isResubmitting === doc.id ? '⏳ Resubmitting...' : 'Submit New Version'}
                                                     </button>
                                                 </div>
                                             )}

@@ -33,15 +33,17 @@ export const Web3Provider = ({ children }) => {
     Lawyer: '0xCc0000000000000000000000000000000000000',
   };
 
-  // Documents, judge, lawyers, notifications
-  const [documents, setDocuments] = useState(() => {
-    try {
-      const stored = localStorage.getItem('judgedox_documents');
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  });
+  // Documents loaded per-judge via judgeAddress effect below.
+  const [documents, setDocuments] = useState([]);
+
+  // judgeAddress = the Judge's wallet that owns the active case room.
+  // For a Judge: their own address. For a Secretary: their paired Judge's address.
+  const [judgeAddress, setJudgeAddress] = useState(null);
+
+  // ─── Storage key helpers ───
+  const getDocsKey = (addr) => addr ? `judgedox_documents_${addr.toLowerCase()}` : null;
+  // Stored under the JUDGE's address: judgedox_judge_secretary_<judgeAddr> = secretaryAddr
+  const getJudgeSecretaryKey = (judgeAddr) => judgeAddr ? `judgedox_judge_secretary_${judgeAddr.toLowerCase()}` : null;
   const [accessTokens, setAccessTokens] = useState(() => {
     try {
       const stored = localStorage.getItem('judgedox_accessTokens');
@@ -205,9 +207,50 @@ export const Web3Provider = ({ children }) => {
     silentlyConnectWallet();
   }, []);
 
+  // ─── Judge Address Resolution ───
+  // Judge → own address (always the room owner).
+  // Secretary → scan localStorage for which Judge has assigned them.
+  useEffect(() => {
+    if (!account || !role) { setJudgeAddress(null); return; }
+    if (role === 'Judge') {
+      setJudgeAddress(account.toLowerCase());
+    } else if (role === 'Secretary') {
+      // Scan all judge-secretary pairings to find our judge.
+      let foundJudge = null;
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('judgedox_judge_secretary_')) {
+            const assignedSecretary = localStorage.getItem(key);
+            if (assignedSecretary && assignedSecretary.toLowerCase() === account.toLowerCase()) {
+              // Extract the judge address from the key suffix
+              foundJudge = key.replace('judgedox_judge_secretary_', '');
+              break;
+            }
+          }
+        }
+      } catch (e) { }
+      setJudgeAddress(foundJudge); // null → Secretary sees "waiting" message
+    } else {
+      setJudgeAddress(null);
+    }
+  }, [account, role]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ─── Per-Judge Document Load ───
+  useEffect(() => {
+    const key = getDocsKey(judgeAddress);
+    if (!key) { setDocuments([]); return; }
+    try {
+      const stored = localStorage.getItem(key);
+      setDocuments(stored ? JSON.parse(stored) : []);
+    } catch { setDocuments([]); }
+  }, [judgeAddress]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ─── Per-Judge Persistence ───
   useEffect(() => {
     try {
-      localStorage.setItem('judgedox_documents', JSON.stringify(documents));
+      const key = getDocsKey(judgeAddress);
+      if (key) localStorage.setItem(key, JSON.stringify(documents));
       if (role) localStorage.setItem('judgedox_role', role);
       else localStorage.removeItem('judgedox_role');
       if (account) localStorage.setItem('judgedox_account', account);
@@ -217,7 +260,7 @@ export const Web3Provider = ({ children }) => {
     } catch (error) {
       console.warn('Could not save state to localStorage', error);
     }
-  }, [documents, account, role, isGuest, accessTokens]);
+  }, [documents, judgeAddress, account, role, isGuest, accessTokens]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── One-Time Access Tokens ───
   const generateAccessToken = (documentId) => {
@@ -236,15 +279,11 @@ export const Web3Provider = ({ children }) => {
   };
 
   const useAccessToken = (token) => {
-    // In local testing, Judge and Lawyer might be in different browser tabs.
-    // React state won't sync automatically, so we read directly from the "database" (localStorage).
+    // Read tokens fresh from localStorage (Judge & Lawyer may be in different tabs).
     let latestTokens = accessTokens;
-    let latestDocs = documents;
     try {
       const storedTokens = localStorage.getItem('judgedox_accessTokens');
       if (storedTokens) latestTokens = JSON.parse(storedTokens);
-      const storedDocs = localStorage.getItem('judgedox_documents');
-      if (storedDocs) latestDocs = JSON.parse(storedDocs);
     } catch (e) { }
 
     const tokenObj = latestTokens.find((t) => t.token === token);
@@ -253,22 +292,58 @@ export const Web3Provider = ({ children }) => {
       return null;
     }
 
-    // Consume the token (one-time use)
+    // Consume the token (one-time use).
     const updatedTokens = latestTokens.filter((t) => t.token !== token);
     setAccessTokens(updatedTokens);
     try {
       localStorage.setItem('judgedox_accessTokens', JSON.stringify(updatedTokens));
     } catch (e) { }
 
-    // Find the document
-    const doc = latestDocs.find((d) => d.id === tokenObj.documentId);
+    // Search all per-judge buckets for the document.
+    let doc = null;
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('judgedox_documents_')) {
+          const parsed = JSON.parse(localStorage.getItem(key) || '[]');
+          const found = parsed.find((d) => d.id === tokenObj.documentId);
+          if (found) { doc = found; break; }
+        }
+      }
+    } catch (e) { }
+
     if (!doc) {
       addNotification('error', 'Document associated with this token not found');
       return null;
     }
-
     addNotification('success', 'Access granted to document successfully!');
     return doc;
+  };
+
+  // ─── Secretary Assignment (done by Judge) ───
+  // Judge calls this to assign a Secretary to their case room.
+  const assignSecretaryToJudge = (secretaryAddr) => {
+    if (!account || !secretaryAddr || secretaryAddr.length < 10) return false;
+    const normalised = secretaryAddr.trim().toLowerCase();
+    const key = getJudgeSecretaryKey(account);
+    if (!key) return false;
+    localStorage.setItem(key, normalised);
+    addNotification('success', `Secretary ${secretaryAddr.slice(0, 6)}...${secretaryAddr.slice(-4)} assigned to your case room`);
+    return true;
+  };
+
+  const removeSecretaryFromJudge = () => {
+    if (!account) return;
+    const key = getJudgeSecretaryKey(account);
+    if (key) localStorage.removeItem(key);
+    addNotification('info', 'Secretary removed from your case room');
+  };
+
+  // Returns the secretary address currently assigned to the connected judge (if any).
+  const getAssignedSecretary = () => {
+    if (!account) return null;
+    const key = getJudgeSecretaryKey(account);
+    return key ? localStorage.getItem(key) : null;
   };
 
   // MetaMask events
@@ -487,6 +562,21 @@ export const Web3Provider = ({ children }) => {
         ipfsHash = result.hash;
       } catch {
         ipfsHash = generateMockHash('ipfs');
+      }
+    }
+
+    // PUSH RESUBMISSION TO BLOCKCHAIN
+    const docToResubmit = documents.find((d) => d.id === id);
+    if (contract && signer && docToResubmit && docToResubmit.onChainId) {
+      try {
+        addNotification('info', `Please confirm the MetaMask transaction to resubmit the document...`);
+        const tx = await contract.resubmitDocument(docToResubmit.onChainId, ipfsHash || 'mock-hash');
+        addNotification('info', `Transaction submitted. Waiting for confirmation...`);
+        await tx.wait();
+        addNotification('success', `Resubmission stored on blockchain!`);
+      } catch (error) {
+        console.error("Blockchain resubmit failed:", error);
+        addNotification('warning', `Blockchain resubmit skipped. ${error.reason || error.message}`);
       }
     }
 
@@ -715,6 +805,9 @@ export const Web3Provider = ({ children }) => {
         // Documents
         documents, setDocuments,
         uploadDocument, resubmitDocument, voteOnDocument, approveDocument, rejectDocument, createDocument,
+
+        // Case Room
+        judgeAddress, assignSecretaryToJudge, removeSecretaryFromJudge, getAssignedSecretary,
 
         // Lawyers & Judge
         registeredLawyers, addLawyer, removeLawyer,

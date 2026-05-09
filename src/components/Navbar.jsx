@@ -18,7 +18,7 @@ const Navbar = () => {
         <nav className="glass-nav" style={{ padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <ShieldAlert className="glow-success" size={28} />
-                <h2 className="gradient-text" style={{ margin: 0, fontSize: '1.5rem', letterSpacing: '-0.5px' }}>JudgeDoX</h2>
+                <h2 className="gradient-text" style={{ margin: 0, fontSize: '1.5rem', letterSpacing: '-0.5px' }}>JuryDox</h2>
 
                 {/* Status indicators */}
                 <div style={{ display: 'flex', gap: '8px', marginLeft: '12px' }}>

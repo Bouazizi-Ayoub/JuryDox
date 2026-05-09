@@ -1,11 +1,14 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { useWeb3 } from '../context/Web3Context';
-import { BarChart2, FileText, CheckCircle2, XCircle, Download, Eye, Link } from 'lucide-react';
+import { BarChart2, FileText, CheckCircle2, XCircle, Download, Eye, Link, UserPlus, UserMinus } from 'lucide-react';
 
 const JudgeDashboard = () => {
-    const { documents, voteOnDocument, getStats, account, role, getIPFSUrl, generateAccessToken } = useWeb3();
+    const { documents, voteOnDocument, getStats, account, role, getIPFSUrl, generateAccessToken,
+        assignSecretaryToJudge, removeSecretaryFromJudge, getAssignedSecretary } = useWeb3();
     const [comments, setComments] = useState({});
     const [selectedDocId, setSelectedDocId] = useState(null);
+    const [secretaryInput, setSecretaryInput] = useState('');
+    const assignedSecretary = getAssignedSecretary();
 
     const stats = getStats();
     const pendingDocs = documents.filter(d => d.status === 'pending' || d.status === 'under_review');
@@ -63,6 +66,55 @@ const JudgeDashboard = () => {
                     <h3>Approuvés</h3>
                     <p>{stats.approved}</p>
                 </div>
+            </div>
+
+            {/* ── My Secretary Panel ── */}
+            <div className="glass-panel" style={{ marginBottom: '2rem', padding: '1.5rem' }}>
+                <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem' }}>
+                    <UserPlus size={18} color="var(--accent-color)" /> My Secretary
+                </h3>
+                {assignedSecretary ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+                        <div>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Assigned Secretary</div>
+                            <div style={{ fontFamily: 'monospace', fontSize: '0.9rem', color: 'var(--accent-color)' }}>{assignedSecretary}</div>
+                        </div>
+                        <button
+                            id="remove-secretary-btn"
+                            onClick={() => { removeSecretaryFromJudge(); setSecretaryInput(''); }}
+                            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '8px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: 'var(--danger-color)', cursor: 'pointer', fontSize: '0.85rem' }}
+                        >
+                            <UserMinus size={14} /> Remove
+                        </button>
+                    </div>
+                ) : (
+                    <div>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', marginBottom: '1rem' }}>
+                            Enter your Secretary's wallet address to give them access to your case room.
+                        </p>
+                        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                            <input
+                                id="secretary-address-input"
+                                type="text"
+                                placeholder="0x… Secretary's wallet address"
+                                value={secretaryInput}
+                                onChange={(e) => setSecretaryInput(e.target.value)}
+                                style={{ flex: 1, minWidth: '260px', padding: '10px 14px', borderRadius: '8px', border: '1px solid rgba(100,116,139,0.4)', background: 'rgba(255,255,255,0.05)', color: 'var(--text-color)', fontFamily: 'monospace', fontSize: '0.85rem' }}
+                            />
+                            <button
+                                id="assign-secretary-btn"
+                                className="btn-primary"
+                                onClick={() => {
+                                    if (assignSecretaryToJudge(secretaryInput)) setSecretaryInput('');
+                                    else alert('Please enter a valid wallet address (at least 10 characters).');
+                                }}
+                                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 18px' }}
+                            >
+                                <UserPlus size={15} /> Assign Secretary
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
 
             <div style={{ marginBottom: '2rem' }}>
